@@ -1,0 +1,3 @@
+v 0.1
+d Diana Goldemberg (diana_goldemberg@g.harvard.edu)
+p DEPENDENCIES - manage project required user-written commands (ado version freeze)
