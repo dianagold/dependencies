@@ -1,0 +1,25 @@
+v 0.1
+
+d 'DEPENDENCIES': manages required user-written commands (ado version freeze)
+d
+d KW: dependencies
+d KW: community-contributed commands
+d KW: user-written commands
+d KW: version freeze
+d KW: reproducibility
+d KW: adopath
+d
+d Requires: Stata version 13
+d
+d Distribution-Date: 20191111
+d
+d Author:  Diana Goldemberg
+d Support: diana_goldemberg@g.harvard.edu
+d
+d License: MIT
+d Repo: https://github.com/dianagold/dependencies
+
+f /dependencies.ado
+f /dependencies.sthlp
+
+e
