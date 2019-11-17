@@ -1,4 +1,4 @@
-*! version 0.1  11nov2019  Diana Goldemberg, diana_goldemberg@g.harvard.edu
+*! version 0.2  16nov2019  Diana Goldemberg, diana_goldemberg@g.harvard.edu
 
 /*------------------------------------------------------------------------------
   Tests the dependencies.ado before making it available in SSC
@@ -39,10 +39,10 @@ if _rc == 111 ssc install ietoolkit
 **********************
 
 * Which: without prior use, should say 'empty' but not give any error
-dependencies, which
+dependencies which
 
 * Remove: without prior use, should say 'empty' but not give any error
-dependencies, remove
+dependencies remove
 
 
 
@@ -58,32 +58,31 @@ qui cd "${mypath}/test"
 qui sysuse auto, clear
 
 * Those quotes do no harm, though not needed
-dependencies, freeze adolist(iegraph iematch)   using(test_me.zip)   replace
-dependencies, freeze adolist("iegraph iematch") using("test_me.zip") replace
+dependencies freeze using test_me.zip, adolist(iegraph iematch) replace
+dependencies freeze using "test_me.zip", adolist("iegraph iematch") replace
 
 * NOT OKAY: without the replace, there will be an error
-//dependencies, freeze adolist(iegraph iematch)   using(test_me.zip)
+//dependencies freeze using "test_me.zip", adolist(iegraph iematch)
 
 * Specifying the package makes it redundand to specify its components
-dependencies, freeze adolist(ietoolkit) using(test_me.zip) replace
-dependencies, freeze adolist(ietoolkit iegraph iematch) using(test_me.zip) replace
+dependencies freeze using "test_me.zip", adolist(ietoolkit) replace
+dependencies freeze using "test_me.zip", adolist(ietoolkit iegraph iematch) replace
 
 * Specifying ados that dont exist gives an error but doesnt break
-dependencies, freeze adolist(iegraph fakename) using("test_me.zip") replace
+dependencies freeze using "test_me.zip", adolist(iegraph fakename) replace
 
 * Full path or semi-full path is equally okay
 qui cd "${mypath}"
-dependencies, freeze adolist(ietoolkit) using("${mypath}/test/test_me.zip") replace
+dependencies freeze using "${mypath}/test/test_me.zip", adolist(ietoolkit) replace
 qui cd ../..
-dependencies, freeze adolist(ietoolkit) using("${mypath}/test/test_me.zip") replace
-
+dependencies freeze using "${mypath}/test/test_me.zip", adolist(ietoolkit) replace
 
 * Given that I had version 5.2 of ietoolkit installed, I will freeze and save to the repo
-//dependencies, freeze adolist(ietoolkit) using("${mypath}/test/ietoolkit_v52.zip") replace
+//dependencies freeze using "${mypath}/test/ietoolkit_v52.zip", adolist(ietoolkit) replace
 
 
 * Use option -all-
-dependencies, freeze all using("${mypath}/test/test_me.zip") replace
+dependencies freeze using "${mypath}/test/test_me.zip", all replace
 
 
 
@@ -101,14 +100,14 @@ dependencies, freeze all using("${mypath}/test/test_me.zip") replace
 
 * Call right zip name in the right dir
 qui cd "${mypath}/test"
-dependencies, unfreeze using(test_me.zip)
+dependencies unfreeze using test_me.zip
 
 * Full path is equally okay
 qui cd ..
-dependencies, unfreeze using("${mypath}/test/test_me.zip")
+dependencies unfreeze using "${mypath}/test/test_me.zip"
 
 * Unfreeze older version of ietoolkit package
-dependencies, unfreeze using("${mypath}/test/ietoolkit_v52.zip")
+dependencies unfreeze using "${mypath}/test/ietoolkit_v52.zip"
 
 
 * Check that some files (like this component of ietoolkit.pkg) will have old/new versions
@@ -122,13 +121,13 @@ which iegraph, all
 **********************
 
 * Which: after prior use, should list ado files
-dependencies, which
+dependencies which
 
 * Remove: after prior use, should wipe out dependencies
-dependencies, remove
+dependencies remove
 
 * Which: after remove, should accuse `empty' again
-dependencies, which
+dependencies which
 
 * And the adofile that will come will be only the new version again
 which iegraph, all
