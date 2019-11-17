@@ -1,4 +1,4 @@
-*! version 0.1  11nov2019  Diana Goldemberg, diana_goldemberg@g.harvard.edu
+*! version 0.2  16nov2019  Diana Goldemberg, diana_goldemberg@g.harvard.edu
 
 /*------------------------------------------------------------------------------
 Freeze and unfreeze versions of user-written ado commands (dependencies)
@@ -8,163 +8,52 @@ Freeze and unfreeze versions of user-written ado commands (dependencies)
 cap program drop dependencies
 program define   dependencies, rclass
 
-  syntax, [           /// ---------- sub-programs-------------------------------
-    freeze            /// save a zip with the dependencies in adolist / all
-    unfreeze          /// unzip to DEPENDENCIES ado-path the frozen dependency
-    which             /// list whethever is currently in the DEPENDENCIES ado-path
-    remove            /// remove the DEPENDENCIES ado-path and all its contents
-                      /// ---------- other options -----------------------------
-    using(string)     /// using zipfile is mandatory for freeze and unfreeze
-    adolist(string)   /// list of ados to be frozen as current installed version
-    all               /// freeze everything found in the PLUS ado-path
-    replace           /// freeze will replace (overwrite) existing zipfile if found
-    ]
+  version 13
 
-    version 13
+  * Back up system settings to be restored after program run
+  local saved_pwd `"`c(pwd)'"'
+  * PLACEHOLDER: what else should be added here???
 
-    * Store pwd to restore after program run
-    local saved_pwd `"`c(pwd)'"'
-    * To avoid macro expansion problems
-    local saved_pwd : subinstr local saved_pwd "\" "/", all
+  gettoken subcmd 0 : 0 , parse(" ,")
 
-    *---------------------------------------------------------------------------
+  * Check that SUBCOMMAND specified is valid
+  if "`subcmd'" == "" {
+    dis as error `"{bf:dependencies} must be followed by a subcommand. Valid subcommands: freeze | unfreeze | which | remove"'
+    exit 198
+  }
+  else if inlist("`subcmd'", "freeze", "unfreeze", "which", "remove") == 0 {
+    dis as error `"{bf:dependencies} {bf:`subcmd'} is unrecognized. Valid subcommands: freeze | unfreeze | which | remove"'
+    exit 198
+  }
 
-    * Check that SUB-PROGRAM options specified are consistent
-    local command_list freeze unfreeze which remove
-
-    * Tracks how many options were chosen and which one to use (the last one)
-    local n_options 0
-    foreach option in `command_list' {
-      if "``option''" != "" {
-        local my_option `option'
-        local ++n_options
-      }
+  * Valid SUBCOMMAND => check if followed by options as expected
+  else {
+    if inlist("`subcmd'", "which", "remove") & "`0'" != "" {
+      dis as error `"{bf:dependencies} {bf:`subcmd'} does not accept any options. Try typing only {bf:dependencies} {bf:`subcmd'}"'
+      exit 198
     }
-
-    if `n_options' > 1 {
-      dis as error "Options cannot be combined. Choose only one option in: `command_list'."
+    if inlist("`subcmd'", "freeze", "unfreeze") & "`0'" == "" {
+      dis as error `"{bf:dependencies} {bf:`subcmd'} require options. Check {bf: help dependencies} for more details"'
       exit 198
     }
 
-    if `n_options' == 0 {
-      dis as error "No option specified. Choose one option in: `command_list'."
-      exit 198
-    }
+    * Complement syntax to be passed with DEPENDENCIES ado-path (not needed for freeze)
+    if "`subcmd'" != "freeze" local depfolder `", depfolder(`c(sysdir_oldplace)'dependencies)"'
 
-    *---------------------------------------------------------------------------
+    * Try to run the SUBCOMMAND but restores the system settings if errors
+    nobreak {
 
-    * Check -freze- suboptions: either -all- or -adolist- must be chosen (not both)
+      capture noisily break dependencies_`subcmd' `0' `depfolder'
+      local rc = _rc
 
-    if "`my_option'" == "freeze" {
+      * PLACEHOLDER: depending on `rc', restore the system settings
 
-      if ("`adolist'" == "" & "`all'" == "") | ("`adolist'" != "" & "`all'" != "") {
-        dis as error "Freeze must be used with either -all- or -adolist- options."
-        exit 198
-      }
-
-      * If adolist local is used, rewrites to pass it on to dependencies_freeze
-      if "`adolist'" != ""  local adolist "adolist(`adolist')"
+      * Change back to original directory
+      qui cd `"`saved_pwd'"'
 
     }
-
-    else {
-
-      if ("`adolist'" != "") | ("`all'" != "") {
-        dis as error "Only -freeze- accepts the -all- or -adolist- options."
-        exit 198
-      }
-
-    }
-
-    *---------------------------------------------------------------------------
-
-    * Check the - using - option, mandatory for freeze/unfreeze,
-    * must be a *.zip that exists (unfreeze) or can be created (freeze)
-
-    if inlist("`my_option'", "freeze", "unfreeze") {
-
-      if `"`using'"' == "" {
-        dis as error "The commands -freeze- and -unfreeze- requires option using(filename.zip)"
-        exit 198
-      }
-
-      * The zipfile passed in option using must be accessible
-      * and we need it to be full path, but the user may have specified relative
-      local pwd_using `"`saved_pwd'/`using'"'
-
-      * The goal is to end with local using being a full filepath/filename
-
-      if "`my_option'" == "unfreeze" {
-        * Try full path first, that is, pwd_using
-        cap confirm file `pwd_using'
-        * If it works, great: update to full filename
-        if _rc == 0 local using `"`pwd_using'"'
-        * Try just what was provided (assume it is already a full path)
-        else confirm file `using'
-        * If this confirm fails, let it break and display error
-      }
-
-      if "`my_option'" == "freeze" {
-
-        * Try full path first, that is, pwd_using
-        cap confirm new file `pwd_using'
-        * If it works, or exists but set to replace: update to full filename
-        if (_rc == 0) | (_rc == 602 & "`replace'" == "replace")  local using `"`pwd_using'"'
-        * If it doesn't work because of replace, better error message
-        else if (_rc == 602 & "`replace'" != "replace") {
-          dis as error `"Must specify -replace- or choose another filename, for `using' already exists."'
-          exit 602
-        }
-        * Try just what was provided (assume it is already a full path)
-        else {
-          cap confirm new file `using'
-          * If it works, or exists but set to replace: nothing to do
-          if (_rc == 0) | (_rc == 602 & "`replace'" == "replace") local keepgoing = 1 // useless action, there must be a more elegant way to just continue
-          * If it doesn't work because of replace, better error message
-          else if (_rc == 602 & "`replace'" != "replace") {
-            dis as error `"Must specify -replace- or choose another filename, for `using' already exists."'
-            exit 602
-          }
-          * If not, repeat original error message if the problem is something else
-          else if confirm new file `using'
-        }
-      }
-
-      * To avoid macro expansion problems
-      local using : subinstr local using "\" "/", all
-
-      * Now we know `using' is accessible and a full filepath
-      * Parse zipfile info into zipdir and zipfn
-      _getfilename "`using'"
-      local zipfn  "`r(filename)'"
-      local zipdir = subinstr(`"`using'"', `"`zipfn'"', "", 1)
-
-      // Lines that helped when debugging quotes issues
-      //noi disp as res `"This is using: `using'"'
-      //noi disp as res `"This is zipdir: `zipdir'"'
-      //noi disp as res `"This is zipfn: `zipfn'"'
-
-      * Test that the using file is a zip
-      if substr(`"`zipfn'"', -4, 4) != ".zip" {
-        noi dis as error `"The using option must end with .zip - you provided `using'"'
-        exit 198
-      }
-
-      * Pass it organized to subcommands
-      local zip `"zipdir(`zipdir') zipfn(`zipfn')"'
-
-    }
-
-    *---------------------------------------------------------------------------
-
-    * Determines the intended DEPENDENCIES ado-path, which is not needed for freeze
-    if "`my_option'" != "freeze" local depfolder `"depfolder(`c(sysdir_oldplace)'dependencies)"'
-
-    * Call appropriate subprogram
-    dependencies_`my_option', `depfolder' `zip' `adolist' `all'
-
-    * Change back to original directory
-    qui cd `"`saved_pwd'"'
+    exit `rc'
+  }
 
 end
 
@@ -177,9 +66,28 @@ program define   dependencies_freeze
 * This subprogram:
 *   save a zip with dependencies specified in adolist
 
-  syntax, zipdir(string) zipfn(string) [adolist(string) all]
+  syntax using/ , [adolist(string) all replace]
 
-  * This is the only subprogram that will open data, so preserve user-data
+  * Must be able to create or replace using file
+  capture confirm new file `using'
+  if (_rc == 602 & "`replace'" != "replace") {
+    dis as error `"Must specify -replace- or choose another filename, for `using' already exists."'
+    exit 602
+  }
+  else if _rc != 0  exit _rc
+
+  * Split using argument into r(path) r(filename) and r(extension)
+  mata: split_using(`"`using'"')
+  local zipdir = "`r(path)'"
+  local zipfn  = "`r(filename)'"
+
+  * Check -freze- suboptions: either -all- or -adolist- must be chosen (not both)
+  if ("`adolist'" == "" & "`all'" == "") | ("`adolist'" != "" & "`all'" != "") {
+    dis as error "{bf: dependencies freeze} must be used with either -all- or -adolist- options."
+    exit 198
+  }
+
+  * This is the only subprogram that will manipulate data, so preserve user-data
   preserve
 
   * Create tempfolder within zipdir, where files will be copied then zipped
@@ -194,103 +102,128 @@ program define   dependencies_freeze
   * If yes, erase contents to be sure it won't have conflicting versions of ados
   else dependencies_clear_dir, dir2clear(`tempfolder')
 
+  * Create file for metadata of frozen dependencies
+  clear
+  set obs 2
+  gen v1 = `"*! dependencies frozen in $S_DATE"' in 1
+  save `"`tempfolder'/dependencies.dta"', replace
+  * For every file package/command, one line will be appended
+
   dis as text _newline "Freezing files..."
 
   quietly {
 
     *---------------------------------------------------------------------------
 
-    * Reads information on installed packages
+    * Reads information on installed packages from stata.trk
+    * most users will only have one stata.trk in their PLUS folder
+    * but the code is flexible to multiple stata.trk files
 
-    cap findfile "stata.trk", path(PLUS)
+    capture findfile "stata.trk", path(`"`c(adopath)'"') all
+    local stata_trk_list `"`r(fn)'"'
+
     if _rc != 0 {
-      noi dis as text "... could not find stata.trk, will only attempt to freeze standalone files"
+      noi dis as text "... could not find any stata.trk along the adopath, will only attempt to freeze standalone files"
     }
 
     else {
-      local stata_trk_dir = subinstr("`r(fn)'", "stata.trk", "", .)
 
-      * Each line is considered a single observation - then parsed later
-      import delimited using "`r(fn)'", delimiter(`"`=char(10)'"') clear
-
-      * First character marks: S (source) N (name) D (installation date) d (description) f (files) U(stata tracker) e(end)
-      gen marker = substr(v1, 1, 1)
-
-      * Making sense of stata.trk means tagging which lines refer to which pkg (N)
-      gen pkg_name = substr(v1, 3, .) if marker == "N"
-      forvalues i = 1/`=_N' {
-        if marker[`i'] == "S" replace    pkg_name = pkg_name[`i' + 1] in `i'
-        if marker[`i'] == "N" local last_pkg_name = pkg_name[`i']
-        if inlist(marker[`i'], "d", "e", "f", "D") replace pkg_name = "`last_pkg_name'" in `i'
+      * Reverse the list of all stata.trk found in adopath
+      * because if a command exists in two places (ie: PLUS & PERSONAL),
+      * it will be copied with replacement twice, and we want the most
+      * prioritarian (which findfile lists first) to be kept (copied last)
+      local n_stata_trk : list sizeof stata_trk_list
+      forvalues i = `n_stata_trk'(-1)1 {
+        local reversed_list "‘reversed_list’‘: word ‘i’ of ‘stata_trk_list’’ "
       }
 
-      *-------------------------------------------------------------------------
+      * Loop through each stata.trk found in adopath
+      foreach stata_trk_file of local reversed_list {
 
-      * Option -all- will freeze everything found in stata.trk
-      if "`all'" == "all" {
-        gen byte to_freeze = 1
-        replace  to_freeze = 0 if inlist(marker, "*", "U")
-      }
+        * Since the paths of files in stata.trk are relative, they need this dir
+        local stata_trk_dir = subinstr(`"`stata_trk_file'"', "stata.trk", "", .)
 
-      * Option -adolist- will only freeze the selected commands
-      else {
-        gen byte to_freeze = 0
-        foreach command of local adolist {
-          * If the command matches a package name, flag file as to_freeze
-          forvalues i = 1/`=_N' {
-            if "`command'.pkg" == "`= pkg_name[`i']'" replace to_freeze = 1 in `i'
+        * Each line is considered a single observation - then parsed later
+        import delimited using `"`stata_trk_file'"', delimiter(`"`=char(10)'"') clear
+
+        * First character marks: S (source) N (name) D (installation date) d (description) f (files) U(stata tracker) e(end)
+        gen marker = substr(v1, 1, 1)
+        drop if inlist(marker, "*", " ", "U", "d")
+
+        * Making sense of stata.trk means tagging which lines refer to which pkg (N)
+        gen pkg_name = substr(v1, 3, .) if marker == "N"
+        forvalues i = 1/`=_N' {
+          if marker[`i'] == "S" replace    pkg_name = pkg_name[`i' + 1] in `i'
+          if marker[`i'] == "N" local last_pkg_name = pkg_name[`i']
+          if inlist(marker[`i'], "e", "f", "D") replace pkg_name = "`last_pkg_name'" in `i'
+        }
+
+        *-------------------------------------------------------------------------
+
+        * Option -all- will freeze everything found in stata.trk
+        if "`all'" == "all" {
+          gen byte to_freeze = 1
+        }
+
+        * Option -adolist- will only freeze the selected commands
+        else {
+          gen byte to_freeze = 0
+          foreach command of local adolist {
+            * If the command matches a package name, flag file as to_freeze
+            forvalues i = 1/`=_N' {
+              if "`command'.pkg" == "`= pkg_name[`i']'" replace to_freeze = 1 in `i'
+            }
           }
         }
-      }
 
-      * Add some metadata in the first observation
-      replace to_freeze = 1 in 1
-      replace v1 = `"*! dependencies frozen in $S_DATE"' in 1
-      keep if to_freeze == 1
+        * Now deals only with the files to freeze
+        keep if to_freeze == 1
+        gen f_name      = substr(v1, 3, .)                       if marker == "f"
+        gen full_f_name = `"`stata_trk_dir'"' + f_name           if marker == "f"
+        replace full_f_name = subinstr(full_f_name, "\", "/", .) if marker == "f"
 
-      * Will later export this metadata file (akin to stata.trk) for documentation
-      save `"`tempfolder'/dependencies.dta"'
-      noi dis as text "... 1 metadata file dependencies.trk"
+        * Will later export this metadata file (akin to stata.trk) for documentation
+        append using `"`tempfolder'/dependencies.dta"'
+        save `"`tempfolder'/dependencies.dta"', replace
 
-      * Now deals only with the files to freeze
-      keep if marker == "f"
-      gen f_name      = substr(v1, 3, .)
-      gen full_f_name = `"`stata_trk_dir'"' + f_name
-      replace full_f_name = subinstr(full_f_name, "\", "/", .)
+        * Some nice info to display
+        tab pkg_name if marker == "f"
+        noi dis as text `"... `r(N)' files from `r(r)' packages in `stata_trk_dir'"'
 
-      * Some nice info to display
-      tab pkg_name
-      noi dis as text "... `r(N)' files from `r(r)' packages"
+        * Local to keep track of packages and files frozen
+        local frozen_pkgs  ""
+        local frozen_files ""
 
-      * Local to keep track of packages and files frozen
-      local frozen_pkgs  ""
-      local frozen_files ""
+        * Loops through all observations (each being a file)
+        keep if marker == "f"
+        if `r(N)' > 0 {
+          forvalues i = 1/`r(N)' {
+            local pkg_to_copy  = pkg_name[`i']
+            local file_to_copy = full_f_name[`i']
+            _getfilename "`file_to_copy'"
+            local filename `"`r(filename)'"'
 
-      * Loops through all observations (each being a file)
-      if `r(N)' > 0 {
-        forvalues i = 1/`r(N)' {
-          local pkg_to_copy  = pkg_name[`i']
-          local file_to_copy = full_f_name[`i']
-          _getfilename "`file_to_copy'"
-          local filename `"`r(filename)'"'
-          * Most important line in this program: copy what needs to be frozen
-          copy `"`file_to_copy'"'  `"`tempfolder'/`r(filename)'"', replace
-          * Update locals with frozen file and package
-          local frozen_pkgs  : list frozen_pkgs  | pkg_to_copy
-          local frozen_files : list frozen_files | filename
+            * Most important line in this program: copy what needs to be frozen
+            copy `"`file_to_copy'"'  `"`tempfolder'/`r(filename)'"', replace
+
+            * Update locals with frozen file and package
+            local frozen_pkgs  : list frozen_pkgs  | pkg_to_copy
+            local frozen_files : list frozen_files | filename
+          }
         }
+
+      * End of section that depends on this stata.trk (goes to the next stata.trk)
       }
-
-      * Create the metadata file (akin to stata.trk)
-      use `"`tempfolder'/dependencies.dta"', clear
-      keep v1
-      export delimited using `"`tempfolder'/dependencies.trk"', delimiter(`"`=char(10)'"') novarnames replace
-      * The dta was only created to avoid messing up with the possibly preserved userdata
-      * but we don't want it saved in the zipfile
-      erase `"`tempfolder'/dependencies.dta"'
-
-    * End of section that depends on stata.trk
     }
+
+    * Create the metadata file (akin to stata.trk)
+    use `"`tempfolder'/dependencies.dta"', clear
+    replace v1 = marker + " " + full_f_name if !missing(full_f_name)
+    keep v1
+    export delimited using `"`tempfolder'/dependencies.trk"', delimiter(`"`=char(10)'"') novarnames replace
+    * The dta was only created temporarily, we don't want it saved in the zipfile
+    erase `"`tempfolder'/dependencies.dta"'
+
 
     *---------------------------------------------------------------------------
 
@@ -355,7 +288,21 @@ program define   dependencies_unfreeze
 * This subprogram:
 *   unzip to DEPENDENCIES ado-path the dependency ados
 
-  syntax, depfolder(string) zipdir(string) zipfn(string)
+  syntax using/ , depfolder(string)
+
+  * Must be able to read using file
+  confirm file `using'
+
+  * Split using argument into r(path) r(filename) and r(extension)
+  mata: split_using(`"`using'"')
+  local zipdir = "`r(path)'"
+  local zipfn  = "`r(filename)'"
+
+  * Check that extension is indeed a zip
+  if `"`r(extension)'"' != ".zip" {
+    noi dis as error `"using must specify a file ending with .zip - you provided `using'"'
+    exit 198
+  }
 
   * Check if the folder already exists
   mata : st_numscalar("r(dirExist)", direxists(`"`depfolder'"'))
@@ -446,7 +393,6 @@ program define   dependencies_remove
 
   * Check if the folder already exists
   mata : st_numscalar("r(dirExist)", direxists(`"`depfolder'"'))
-
   if `r(dirExist)' == 0  dis as result `"There is no -dependencies- ado path set up (nothing to be removed)."'
 
   else {
@@ -482,4 +428,51 @@ program define   dependencies_clear_dir
 
   if "`rmdir'" == "rmdir"  rmdir `"`dir2clear'"'
 
+end
+
+
+* Not terribly elegant, but does the trick
+cap mata: mata drop split_using()
+
+*------------------------------- MATA -----------------------------------------
+
+mata:
+mata set matastrict on
+
+void split_using(string scalar using2split) {
+// using2split broken into macros: r(path), r(filename), r(extension)
+// if the path is not absolute, it is autocompleted with pwd
+
+  string scalar path,
+                filename,
+                extension
+
+  pragma unset path
+  pragma unset filename
+  pragma unset extension
+
+  // Autocomplete to absolute path if relative path
+  if (pathisabs(using2split) == 0) {
+    using2split = pathjoin(pwd(), using2split)
+  }
+
+  // Attempt to extract file extension
+  extension = pathsuffix(using2split)
+
+  // If there is no extension, the whole thing is a path (filename is empty)
+  if (extension == "") {
+    filename = ""
+    path = using2split
+  }
+
+  else {
+    pathsplit(using2split, path, filename)
+  }
+
+  st_rclear()
+  st_global("r(path)", path)
+  st_global("r(filename)", filename)
+  st_global("r(extension)", extension)
+
+}
 end
