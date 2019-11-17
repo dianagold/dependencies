@@ -28,11 +28,11 @@ program define   dependencies, rclass
 
   * Valid SUBCOMMAND => check if followed by options as expected
   else {
-    if inlist("`subcmd'", "which", "remove") & "`0'" != "" {
+    if inlist("`subcmd'", "which", "remove") & `"`0'"' != "" {
       dis as error `"{bf:dependencies} {bf:`subcmd'} does not accept any options. Try typing only {bf:dependencies} {bf:`subcmd'}"'
       exit 198
     }
-    if inlist("`subcmd'", "freeze", "unfreeze") & "`0'" == "" {
+    if inlist("`subcmd'", "freeze", "unfreeze") & `"`0'"' == "" {
       dis as error `"{bf:dependencies} {bf:`subcmd'} require options. Check {bf: help dependencies} for more details"'
       exit 198
     }
@@ -74,7 +74,7 @@ program define   dependencies_freeze
     dis as error `"Must specify -replace- or choose another filename, for `using' already exists."'
     exit 602
   }
-  else if _rc != 0  exit _rc
+  else if (_rc != 602 & _rc != 0)  exit _rc
 
   * Split using argument into r(path) r(filename) and r(extension)
   mata: split_using(`"`using'"')
@@ -102,16 +102,16 @@ program define   dependencies_freeze
   * If yes, erase contents to be sure it won't have conflicting versions of ados
   else dependencies_clear_dir, dir2clear(`tempfolder')
 
-  * Create file for metadata of frozen dependencies
-  clear
-  set obs 2
-  gen v1 = `"*! dependencies frozen in $S_DATE"' in 1
-  save `"`tempfolder'/dependencies.dta"', replace
-  * For every file package/command, one line will be appended
-
   dis as text _newline "Freezing files..."
 
   quietly {
+
+    * Create file for metadata of frozen dependencies
+    clear
+    set obs 2
+    gen v1 = `"*! dependencies frozen in $S_DATE"' in 1
+    save `"`tempfolder'/dependencies.dta"', replace
+    * For every file package/command, one line will be appended
 
     *---------------------------------------------------------------------------
 
@@ -134,7 +134,7 @@ program define   dependencies_freeze
       * prioritarian (which findfile lists first) to be kept (copied last)
       local n_stata_trk : list sizeof stata_trk_list
       forvalues i = `n_stata_trk'(-1)1 {
-        local reversed_list "‘reversed_list’‘: word ‘i’ of ‘stata_trk_list’’ "
+        local reversed_list "`reversed_list' `: word `i' of `stata_trk_list''"
       }
 
       * Loop through each stata.trk found in adopath
@@ -267,7 +267,7 @@ program define   dependencies_freeze
 
     * Zip all files copied in tempfolder into using zipfile.zip
     cd `"`tempfolder'"'
-    zipfile *.*, saving(`"`zipdir'`zipfn'"', replace)
+    zipfile *.*, saving(`"`zipdir'/`zipfn'"', replace)
     cd `"`zipdir'"'
 
   }
@@ -275,7 +275,7 @@ program define   dependencies_freeze
   * Erase the tempfolder and all its contents
   dependencies_clear_dir, dir2clear(`tempfolder') rmdir
 
-  dis as text `"Successfully frozen dependencies in `zipdir'`zipfn'"'
+  dis as text `"Successfully frozen dependencies in `zipdir'/`zipfn'"'
 
 end
 
