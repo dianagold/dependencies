@@ -1,4 +1,4 @@
-v 0.1
+v 0.2
 
 d 'DEPENDENCIES': manages required user-written commands (ado version freeze)
 d
@@ -11,7 +11,7 @@ d KW: adopath
 d
 d Requires: Stata version 13
 d
-d Distribution-Date: 20191111
+d Distribution-Date: 20191116
 d
 d Author:  Diana Goldemberg
 d Support: diana_goldemberg@g.harvard.edu
