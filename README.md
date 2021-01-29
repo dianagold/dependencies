@@ -10,9 +10,11 @@ Keywords: _dependencies | reproducibility | community-contributed commands | use
 
 ## Installation
 
-  **dependencies** is currently not published on [SSC](https://www.stata.com/support/ssc-installation/), so it cannot be installed through `ssc install`.
-
-  If you want to install the most recent carefully curated version of  **dependencies** then you can use the code below:
+  The most recent version of **dependencies** (version 0.2) is currently published on [SSC](https://www.stata.com/support/ssc-installation/), so it can be installed through this code:
+```
+ssc install dependencies 
+```
+  The same version of **dependencies** can be installed using this code:
 ```
 net install dependencies, from("https://raw.githubusercontent.com/dianagold/dependencies/master/src") replace
 ```
